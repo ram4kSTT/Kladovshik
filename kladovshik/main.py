@@ -13,11 +13,11 @@ brick.sound.beep()
 
 leftMotor = Motor(Port.B)
 rightMotor = Motor(Port.C)
-grabMotor = Motor(Port.D)
+grabMotor = Motor(Port.A)
 colorSensorGruz = ColorSensor(Port.S1)
 colorSensorRight = ColorSensor(Port.S2)
 colorSensorLeft = ColorSensor(Port.S3)
-Const_turn_Angle = 155
+Const_turn_Angle = 170
 Const_turn_Speed = 50
 Const_Razvorot_Angle = 330
 Const_Razvorot_Speed = 50
@@ -25,11 +25,13 @@ Const_Grab_Speed = 200
 Const_Grab_angle = 150
 Const_Go_Speed = 200
 Const_Relection_Limit = 20
-Const_Speed_Fline = 20
+Const_Speed_Fline = 170
 Const_Slow_Speed_Fline = 50
 Const_MotorRule_Speed = 150
-Robot = [2,0]
-Platform = [0,0]
+Const_checkColor_Speed = 50
+robotPosition = [0,0]
+actualColor = 0
+
 
 ##################################################################################
 ColorMap = [
@@ -92,28 +94,18 @@ def motorRule(left,right):
 
 #езда по черной линии
 #crossroadCounts - кол-во перекрестков, которые необходимо проехать
-def fLine(crossroadCounts):
-  print("fLine:")
+def crossroadGo(crossroadCounts):
+  print("crossroadGo:")
   print(crossroadCounts)
 
   colors = [Color.GREEN,Color.RED,Color.BLUE,Color.BROWN]
+
   colorCounts = 0
   crossroad = 0
   blackLine = False
   while(True):
-    reflectionLEFT = colorSensorLeft.reflection()
-    reflectionRight = colorSensorRight.reflection()
 
-    if(reflectionLEFT < Const_Relection_Limit):
-      if(reflectionRight < Const_Relection_Limit):
-        motorRule(Const_Speed_Fline,Const_Speed_Fline)
-      else:
-        motorRule(-Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
-    else:
-      if(reflectionRight < Const_Relection_Limit):
-        motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
-      else:
-        motorRule(Const_Speed_Fline,Const_Speed_Fline)
+    fLine(reflectionLEFT,reflectionRight)
     
     if((reflectionLEFT < Const_Relection_Limit) & (reflectionRight < Const_Relection_Limit)):
       if(blackLine == False):
@@ -132,37 +124,39 @@ def fLine(crossroadCounts):
         motorRule(0,0)
         break
 #определяет путь от местоположение робота до нужной платформы
-def logic():
+#Robot - координаты робота
+#Platform - координаты платформы
+def logic(Robot,Platform):
   print("logic:")
   print("рассчитываем путь")
+  povorot1 = 0 
   povorot2 = 0
-  povorot1 = 1
-  countsBlackCrossroad =abs(Robot[0] - Platform[0])
-  robotWay = [["grab", 1], ["razovorot", 0 ],["fLine",1] ]
+  horizontal = Platform[0] - Robot[0]
+
+  robotWay = [["razovorot", 0 ],["crossroadGo",1] ]
   
-  if(Robot[1] == 0):
-    povorot1 * -1 
-  if(Robot[0] - Platform[0]  == -1) or (Robot[0] - Platform[0]  == -2):
-   povorot2 = -1
+  if(Robot[0]==Platform[0]):
+    return [["razovorot", 0 ],["crossroadGo",1],["checkColor",0]]
+
+  if(horizontal<0):
+    povorot1 = -1
   else:
+    povorot1 = 1
+  if(Robot[1] == 0):
+    povorot1 = povorot1 * -1
+  
+  if(horizontal>0):
     povorot2 = 1
-  if(Robot[0] - Platform[0]  == -1) or (Robot[0] - Platform[0]  == -2) and (Platform[1] == 0):
+  else:
     povorot2 = -1
-  elif(Robot[0] - Platform[0]  == -1) or (Robot[0] - Platform[0]  == -2) and (Platform[1] == 1):
-    povorot2 = 1
-  elif(Robot[0] - Platform[0]  == 1) or (Robot[0] - Platform[0]  == 2) and (Platform[1] == 0):
-    povorot2 = -1
-  elif(Robot[0] - Platform[0]  == -1) or (Robot[0] - Platform[0]  == -2) and (Platform[1] == 1):
-    povorot2 = 1
-  elif(Robot[0] == Platform[0]) and (Robot[1] == Platform[1]):
-    robotWay.append(["MotorRule",2])
-    robotWay.append(["razovorot",0])
-    robotWay.append(["fLine",1])
-  elif(Robot[0] == Platform[0]):
-    robotWay.append(["MotorRule",0])
-  robotWay.append(["turn", povorot1])
-  robotWay.append(["fLine",countsBlackCrossroad])
-  robotWay.append(["turn", povorot2])
+  if(Platform[1]==0):
+    povorot2 = povorot2 * -1
+  
+  robotWay.append(["turn",povorot1])
+  robotWay.append(["crossroadGo",abs(horizontal)])
+  robotWay.append(["turn",povorot2])
+  robotWay.append(["checkColor",0])
+  
   return robotWay
 
 #проезжает от местоположения робота до нужной платформы
@@ -175,11 +169,48 @@ def perfomer(robotWay):
       turn(way[1])
     elif(way[0] == "razovorot"):
       razovorot()
-    elif(way[0] == "fLine"):
-      fLine(way[1])
+    elif(way[0] == "crossroadGo"):
+      crossroadGo(way[1])
     elif(way[0] == "grab"):
       grab()
+    elif(way[0] == "checkColor"):
+      checkColor()
 
 
+# смотрит цвет кубика и записывает его в переменную
+def checkColor():
+  print("чекаем цвет")
+  actualColor = colorSensorGruz.color()
+  while(actualColor == None):
+    fLine
+      
+      break
+      return
+#едем по чёрной линии
+#reflectionLEFT - значение с датчика цвета
+#reflectionRight - значение с датчика цвета
+def fLine(reflectionLEFT,reflectionRight):
+  reflectionLEFT = colorSensorLeft.reflection()
+  reflectionRight = colorSensorRight.reflection()
+  if(reflectionLEFT < Const_Relection_Limit):
+      if(reflectionRight < Const_Relection_Limit):
+        motorRule(Const_Speed_Fline,Const_Speed_Fline)
+      else:
+        motorRule(-Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
+  else:
+      if(reflectionRight < Const_Relection_Limit):
+        motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
+      else:
+        motorRule(Const_Speed_Fline,Const_Speed_Fline)
+        
 
-perfomer(logic())
+
+def start():
+  crossroadGo(1)
+  turn(-1)
+  checkColor()
+  
+
+
+start()
+perfomer(logic(robotPosition,[2,1]))
