@@ -45,25 +45,22 @@ def turn(directionTurn):
   print("turn:")
   print(directionTurn)
   leftMotor.reset_angle(0)
-  leftMotor.dc(Const_turn_Speed *  directionTurn)
-  rightMotor.dc(-Const_turn_Speed *  directionTurn)
+  motorRule(Const_turn_Speed *  directionTurn,-Const_turn_Speed *  directionTurn)
   while(True):
       angle = abs(leftMotor.angle())
       if(angle >= Const_turn_Angle):
-          leftMotor.stop()
-          rightMotor.stop()
+          motorStop()
           break
 #разварачиваемся на 180 градусов
 def razovorot():
   print("разворачиваемся")
   leftMotor.reset_angle(0)
-  leftMotor.dc(Const_turn_Speed)
-  rightMotor.dc(-Const_turn_Speed)
+
+  motorRule(Const_Razvorot_Speed,-Const_Razvorot_Speed)
   while(True):
       angle = abs(leftMotor.angle())
       if(angle >= Const_Razvorot_Angle):
-          leftMotor.stop()
-          rightMotor.stop()
+          motorStop()
           break
           
 
@@ -98,31 +95,23 @@ def crossroadGo(crossroadCounts):
   print("crossroadGo:")
   print(crossroadCounts)
 
-  colors = [Color.GREEN,Color.RED,Color.BLUE,Color.BROWN]
-
-  colorCounts = 0
   crossroad = 0
   blackLine = False
   while(True):
-
+    reflectionLEFT = colorSensorLeft.reflection()
+    reflectionRight = colorSensorRight.reflection()
     fLine(reflectionLEFT,reflectionRight)
     
     if((reflectionLEFT < Const_Relection_Limit) & (reflectionRight < Const_Relection_Limit)):
       if(blackLine == False):
         crossroad = crossroad + 1
         if(crossroad == crossroadCounts):
-          motorRule(0,0)
+          motorStop()
           break
       blackLine = True
     else:
       blackLine = False
     color = colorSensorGruz.color()
-    if(color in colors):
-      print(color)
-      colorCounts = colorCounts + 1
-      if(colorCounts > 0):
-        motorRule(0,0)
-        break
 #определяет путь от местоположение робота до нужной платформы
 #Robot - координаты робота
 #Platform - координаты платформы
@@ -182,16 +171,15 @@ def checkColor():
   print("чекаем цвет")
   actualColor = colorSensorGruz.color()
   while(actualColor == None):
+    reflectionLEFT = colorSensorLeft.reflection()
+    reflectionRight = colorSensorRight.reflection()
     fLine
       
-      break
-      return
+    return
 #едем по чёрной линии
 #reflectionLEFT - значение с датчика цвета
 #reflectionRight - значение с датчика цвета
 def fLine(reflectionLEFT,reflectionRight):
-  reflectionLEFT = colorSensorLeft.reflection()
-  reflectionRight = colorSensorRight.reflection()
   if(reflectionLEFT < Const_Relection_Limit):
       if(reflectionRight < Const_Relection_Limit):
         motorRule(Const_Speed_Fline,Const_Speed_Fline)
@@ -202,6 +190,13 @@ def fLine(reflectionLEFT,reflectionRight):
         motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
       else:
         motorRule(Const_Speed_Fline,Const_Speed_Fline)
+
+
+
+def motorStop():
+  leftMotor.stop()
+  rightMotor.stop()
+
         
 
 
