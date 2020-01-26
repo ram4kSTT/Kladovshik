@@ -24,8 +24,8 @@ gyroSensor = GyroSensor(Port.S4)
 Const_turn_Angle = 80
 Const_turn_Speed = 150
 Const_Razvorot_Angle = 160
-Const_Grab_Speed = 25
-Const_Grab_angle = 140
+Const_Grab_Speed = -125
+Const_Grab_angle = 180
 Const_Go_Speed = 200
 Const_Relection_Limit = 15
 Const_Speed_Fline = 250
@@ -34,10 +34,11 @@ Const_Slow_Speed_Fline_Small = -50
 Const_MotorRule_Speed = 150
 Const_checkColor_Speed = 50
 Const_Go_Forward_Speed = 300
-Const_Go_Forward_Time = 1.3
-Const_Desired_Color = Color.RED
+Const_Go_Forward_Time = 1.5
+Const_Desired_Color = 5
 ev3AdeptedFlineSpeed = 250
 
+checkedColor = Color.BLACK
 ############################################################################
 platformMap = [
   [pl.Platform(Color.RED),pl.Platform(Color.YELLOW),pl.Platform(Color.GREEN)],
@@ -58,11 +59,8 @@ def turn(directionTurn):
         motorStop()
         break
   else:
-    motorRule(Const_turn_Speed,-Const_turn_Speed)
-    while(True):
-      if(abs(gyroSensor.angle()) >= Const_Razvorot_Angle):
-        motorStop()
-        break
+    if(colorSensorLeft.color = Color.WHITE):
+      
   GoForward(Const_turn_Speed,Const_turn_Speed,0.5)
    
 #захват кубика манипулятором
@@ -71,11 +69,11 @@ def grab():
   grabMotor.reset_angle(0)
   grabMotor.run(Const_Grab_Speed)
   while(True):
-    angleGrab = grabMotor.angle()
-    if(angleGrab >= Const_Grab_angle ):
+    if(abs(grabMotor.angle()) >= Const_Grab_angle ):
         print("кубик")
         grabMotor.stop()
         return
+
 
 #езда по черной линии
 #left - мощность левого мотора
@@ -83,6 +81,22 @@ def grab():
 def motorRule(left,right):
     leftMotor.run(left)
     rightMotor.run(right)
+
+def ev3AdepterMotorRule(angle,speed):
+  
+  angle = angle * 0.20
+  if(angle>100):
+    angle=100
+  elif(angle<-100):
+    angle = - 100
+  factorAngleSpeed = (50 - abs(angle)) / 50
+  if(angle > 0):
+    motorRule(speed,speed * factorAngleSpeed)
+  elif(angle < 0):
+    motorRule(speed * factorAngleSpeed,speed)
+
+def ev3AdeptedFline(reflectionLEFT,reflectionRight):
+  ev3AdepterMotorRule(reflectionLEFT - reflectionRight,ev3AdeptedFlineSpeed)
 
 #езда по черной линии
 #crossroadCounts - кол-во перекрестков, которые необходимо проехать
@@ -117,50 +131,34 @@ def logic(Robot,Platform):
   povorot1 = 0 
   povorot2 = 0
   print(Platform)
-  horizontal = Platform[0] - Robot[0]
+  print(Robot)
+  horizontal = Platform[1] - Robot[1]
 
   robotWay = [["razovorot", 0 ],["crossroadGo",1] ]
   
-  if(Robot[0]==Platform[0]):
+  if(Robot[1]==Platform[1]):
     return [["razovorot", 0 ],["checkColor",0]]
 
   if(horizontal<0):
     povorot1 = -1
   else:
     povorot1 = 1
-  if(Robot[1] == 0):
+  if(Robot[0] == 0):
     povorot1 = povorot1 * -1
   
   if(horizontal>0):
     povorot2 = 1
   else:
     povorot2 = -1
-  if(Platform[1]==0):
+  if(Platform[0]==0):
     povorot2 = povorot2 * -1
   
   robotWay.append(["turn",povorot1])
   robotWay.append(["crossroadGo",abs(horizontal)])
   robotWay.append(["turn",povorot2])
-  robotWay.append(["checkColor",0])
   
   return robotWay
 
-#вызывает последовательность методов соотвесвующие полученным командам
-#robotWay - набор команд для проезда робота до нужной платформы
-def perfomer(robotWay):
-  print("perfomer:")
-  print(robotWay)
-  for way in robotWay:
-    if(way[0] == "turn"):
-      turn(way[1])
-    elif(way[0] == "razovorot"):
-      turn(0)
-    elif(way[0] == "crossroadGo"):
-      crossroadGo(way[1])
-    elif(way[0] == "grab"):
-      grab()
-    elif(way[0] == "checkColor"):
-      checkColor()
 
 # смотрит цвет кубика и записывает его в переменную
 def checkColor():
@@ -215,78 +213,99 @@ def motorStop():
   leftMotor.stop()
   rightMotor.stop()
 
+#вызывает последовательность методов соотвесвующие полученным командам
+#robotWay - набор команд для проезда робота до нужной платформы
+def perfomer(robotWay):
+  print("perfomer:")
+  print(robotWay)
+  for way in robotWay:
+    if(way[0] == "turn"):
+      turn(way[1])
+    elif(way[0] == "razovorot"):
+      turn(0)
+    elif(way[0] == "crossroadGo"):
+      crossroadGo(way[1])
+    elif(way[0] == "grab"):
+      grab()
+
 #метод для проезда до стартовой платформы
 def start():
   print("едем до стартовой платформы")
   GoForward(Const_Go_Forward_Speed,Const_Go_Forward_Speed, Const_Go_Forward_Time)
-  perfomer([["crossroadGo",1],["turn",-1],["checkColor",0]])
+  perfomer([["crossroadGo",1],["turn",-1]])
   
 #ищет нужную платформу
 def findColor(color):
   print("ищем нужную платформу")
+  print('цвет:'+str(color))
   for x in range(0,3):
     for y in range(0,2):
-      thisPlatform = platformMap[x][y]
+      thisPlatform = platformMap[y][x]
       if(color == None):
         if(thisPlatform.status == 0):
-            return [x,y]
+            return [y,x]
       else:
-        thisPlatform = platformMap[x][y]
-        if(Const_Desired_Color == color):
+        if(thisPlatform.color == color):
           if(thisPlatform.status == -1 or thisPlatform.status == 0):
-            return [x,y]
+            return [y,x]
+  print("ничего не нашел")
 
-def pereborPlatform():
+def pereborPlatform(robotPosition):
   print("перебираю гаражи")
-  robotPosition = [0,0]
   for x in range(0,3): 
     for y in range(0,2):
       if(x != 0 or y != 0):
         #TODO
-        newLogic = logic(robotPosition,[x,y])
+        newLogic = logic(robotPosition,[y,x])
         perfomer(newLogic)
-        GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,)
-        robotPosition = [x,y]
-        if(filterColor()==Const_Desired_Color):
-          return
+        color = checkColor()
+        robotPosition = [y,x]
+        if(color==Const_Desired_Color):
+          print('Нашел нужный цвет')
+          print(color)
+          return robotPosition
+        GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
+        
 
 def main():
+  cubeStorage = False
   robotPosition = [0,0]
   start()
+  color = checkColor()
   if(filterColor()!=Const_Desired_Color):
-    GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time)
-    pereborPlatform()
+    GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
+    robotPosition = pereborPlatform(robotPosition)
+    platformMap[robotPosition[0]][robotPosition[1]].status= -1
+    cubeStorage = True
+  print('нашел нужный цвет!')
   for x in range(0,6):
     colorPlatformPosition = findColor(filterColor())
-    GoForward(20,20,0.4)#TODO
+    GoForward(20,20,0.2)#TODO
     grab()
+    GoForward(20,20,0.-0.2)
     newLogic = logic(robotPosition,colorPlatformPosition)
     perfomer(newLogic)
+    color = checkColor()
     robotPosition = colorPlatformPosition
-    ColorMap[colorPlatformPosition[0]][colorPlatformPosition[1]] = -1
+    if(cubeStorage):
+      platformMap[robotPosition[0]][robotPosition[1]].status = 1
+    else:
+      platformMap[robotPosition[0]][robotPosition[1]].status = -1
+    cubeStorage = 1
 
 def filterColor():
     color = colorSensorGruz.color()
     colorFilter = [Color.RED,Color.BLUE,Color.YELLOW,Color.GREEN]
+    if(color == Color.BROWN):
+      color = Color.YELLOW
+    if(color == Color.GREEN):
+      if(colorSensorGruz.rgb()[1] < colorSensorGruz.rgb()[2]):
+        color = Color.BLUE
+      else:
+        color = color
     if(color in colorFilter):
       return(color)
     else:
       return(None)
-
-def ev3AdepterMotorRule(angle,speed):
-  
-  angle = angle * 0.20
-  if(angle>100):
-    angle=100
-  elif(angle<-100):
-    angle = - 100
-  factorAngleSpeed = (50 - abs(angle)) / 50
-  if(angle > 0):
-    motorRule(speed,speed * factorAngleSpeed)
-  elif(angle < 0):
-    motorRule(speed * factorAngleSpeed,speed)
-
-def ev3AdeptedFline(reflectionLEFT,reflectionRight):
-  ev3AdepterMotorRule(reflectionLEFT - reflectionRight,ev3AdeptedFlineSpeed)
 
 main()
