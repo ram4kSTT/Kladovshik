@@ -14,16 +14,16 @@ import time
 
 leftMotor = Motor(Port.B)
 rightMotor = Motor(Port.C)
-grabMotor = Motor(Port.A)
+grabMotor = Motor(Port.D)
 
 colorSensorGruz = ColorSensor(Port.S1)
 colorSensorRight = ColorSensor(Port.S2)
 colorSensorLeft = ColorSensor(Port.S3)
-gyroSensor = GyroSensor(Port.S4)
+UltrasonicSensor = UltrasonicSensor(Port.S4)
 
-Const_turn_Angle = 80
-Const_turn_Speed = 150
-Const_Razvorot_Angle = 160
+Const_turn_Angle = 195
+Const_turn_Speed = 180
+Const_Razvorot_Angle = 390
 Const_Grab_Speed = -125
 Const_Grab_angle = 180
 Const_Go_Speed = 200
@@ -51,17 +51,19 @@ robotPosition = [0,0]
 def turn(directionTurn):
   print("turn:")
   print(directionTurn)
-  gyroSensor.reset_angle(0)
-  if(directionTurn == -1 or directionTurn == 1):
-    motorRule(Const_turn_Speed *  directionTurn,-Const_turn_Speed *  directionTurn)
+  rightMotor.reset_angle(0)
+  if(directionTurn == 1 or directionTurn == -1):
+    motorRule(Const_turn_Speed * directionTurn,-Const_turn_Speed * directionTurn)
     while(True):
-      if(abs(gyroSensor.angle()) >= Const_turn_Angle):
+      if(abs(rightMotor.angle()) >= Const_turn_Angle):
         motorStop()
-        break
   else:
-    if(colorSensorLeft.color = Color.WHITE):
-      
-  GoForward(Const_turn_Speed,Const_turn_Speed,0.5)
+    rightMotor.reset_angle(0)
+    motorRule(Const_turn_Speed,-Const_turn_Speed)
+    while(True):
+      if(abs(rightMotor.angle()) >= Const_Razvorot_Angle):
+        motorStop()
+        return
    
 #захват кубика манипулятором
 def grab():
@@ -74,7 +76,6 @@ def grab():
         grabMotor.stop()
         return
 
-
 #езда по черной линии
 #left - мощность левого мотора
 #right - мощность правого мотора
@@ -84,7 +85,7 @@ def motorRule(left,right):
 
 def ev3AdepterMotorRule(angle,speed):
   
-  angle = angle * 0.20
+  angle = angle * 0.15
   if(angle>100):
     angle=100
   elif(angle<-100):
@@ -308,4 +309,5 @@ def filterColor():
     else:
       return(None)
 
-main()
+while(True):
+  print(UltrasonicSensor.distance())
