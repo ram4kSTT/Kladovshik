@@ -1,7 +1,7 @@
 #!/usr/bin/env pybricks-micropython
 from pybricks import ev3brick as brick
 from pybricks.ev3devices import (Motor, TouchSensor, ColorSensor,
-                                 InfraredSensor, UltrasonicSensor, GyroSensor)
+                                 UltrasonicSensor, UltrasonicSensor, GyroSensor)
 from pybricks.parameters import (Port, Stop, Direction, Button, Color,
                                  SoundFile, ImageFile, Align)
 from pybricks.tools import print, wait, StopWatch
@@ -26,11 +26,11 @@ Const_turn_Speed = 180
 Const_Razvorot_Angle = 390
 Const_Grab_Speed = -125
 Const_Grab_angle = 180
+Const_Normal_Distance = 60
 Const_Go_Speed = 200
-Const_Relection_Limit = 15
-Const_Speed_Fline = 250
-Const_Slow_Speed_Fline_Big= 150
-Const_Slow_Speed_Fline_Small = -50
+Const_Relection_Limit = 10
+Const_Speed_Fline = 200
+Const_Slow_Speed_Fline = 100
 Const_MotorRule_Speed = 150
 Const_checkColor_Speed = 50
 Const_Go_Forward_Speed = 300
@@ -57,6 +57,7 @@ def turn(directionTurn):
     while(True):
       if(abs(rightMotor.angle()) >= Const_turn_Angle):
         motorStop()
+        return
   else:
     rightMotor.reset_angle(0)
     motorRule(Const_turn_Speed,-Const_turn_Speed)
@@ -97,7 +98,7 @@ def ev3AdepterMotorRule(angle,speed):
     motorRule(speed * factorAngleSpeed,speed)
 
 def ev3AdeptedFline(reflectionLEFT,reflectionRight):
-  ev3AdepterMotorRule(reflectionLEFT - reflectionRight,ev3AdeptedFlineSpeed)
+  ev3AdepterMotorRule(reflectionLEFT - reflectionRight,ev3AdeptedflineSpeed)
 
 #езда по черной линии
 #crossroadCounts - кол-во перекрестков, которые необходимо проехать
@@ -110,7 +111,7 @@ def crossroadGo(crossroadCounts):
   while(True):
     reflectionLEFT = colorSensorLeft.reflection()
     reflectionRight = colorSensorRight.reflection()
-    ev3AdeptedFline(reflectionLEFT,reflectionRight)
+    fLine(reflectionLEFT,reflectionRight)
     
     if((reflectionLEFT < Const_Relection_Limit) & (reflectionRight < Const_Relection_Limit)):
       if(blackLine == False):
@@ -162,7 +163,7 @@ def logic(Robot,Platform):
 
 
 # смотрит цвет кубика и записывает его в переменную
-def checkColor():
+def checkColor(colorPlatform):
   print("чекаем цвет")
   color = None
   iteration = 0
@@ -171,26 +172,30 @@ def checkColor():
       reflectionLEFT = colorSensorLeft.reflection()
       reflectionRight = colorSensorRight.reflection()
 
-      ev3AdeptedFline(reflectionLEFT,reflectionRight)
-    color = filterColor()
-    if(color != None):
-      print("нашел цвет:")
-      print(color)
-      return color
+      fLine(reflectionLEFT,reflectionRight)
+    if(colorPlatform != None):
+      if(colorPlatform == filterColor(colorSensorLeft)):
+        return None
+    else:
+      color = filterColor(colorSensorGruz)
+      if(color != None):
+        print("нашел цвет:")
+        print(color)
+        return color
     iteration = iteration + 1
 
 #едем по чёрной линии
 #reflectionLEFT - значение с датчика цвета
 #reflectionRight - значение с датчика цвета
 def fLine(reflectionLEFT,reflectionRight):
-  if(reflectionLEFT < Const_Relection_Limit):
+    if(reflectionLEFT < Const_Relection_Limit):
+        if(reflectionRight < Const_Relection_Limit):
+          motorRule(Const_Speed_Fline,Const_Speed_Fline)
+        else:
+          motorRule(-Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
+    else:
       if(reflectionRight < Const_Relection_Limit):
-        motorRule(Const_Speed_Fline,Const_Speed_Fline)
-      else:
-        motorRule(-Const_Slow_Speed_Fline_Small,Const_Slow_Speed_Fline_Big)
-  else:
-      if(reflectionRight < Const_Relection_Limit):
-        motorRule(Const_Slow_Speed_Fline_Big,-Const_Slow_Speed_Fline_Small)
+        motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
       else:
         motorRule(Const_Speed_Fline,Const_Speed_Fline)
 
@@ -241,6 +246,7 @@ def findColor(color):
   print('цвет:'+str(color))
   for x in range(0,3):
     for y in range(0,2):
+      distance = UltrasonicSensor.distance()
       thisPlatform = platformMap[y][x]
       if(color == None):
         if(thisPlatform.status == 0):
@@ -272,21 +278,28 @@ def main():
   cubeStorage = False
   robotPosition = [0,0]
   start()
-  color = checkColor()
-  if(filterColor()!=Const_Desired_Color):
+  color = checkColor(None)
+  if(filterColor(colorSensorGruz)!=Const_Desired_Color):
     GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
     robotPosition = pereborPlatform(robotPosition)
     platformMap[robotPosition[0]][robotPosition[1]].status= -1
     cubeStorage = True
   print('нашел нужный цвет!')
   for x in range(0,6):
-    colorPlatformPosition = findColor(filterColor())
+    colorPlatformPosition = findColor(filterColor(colorSensorGruz))
     GoForward(20,20,0.2)#TODO
     grab()
+    GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
     GoForward(20,20,0.-0.2)
     newLogic = logic(robotPosition,colorPlatformPosition)
     perfomer(newLogic)
-    color = checkColor()
+    #Если мы знаем, что едем нга пустую платформу, то вызываем checkColor с параметром не NONE
+    if(colorPlatformPosition.status = -1):
+      checkColor(platformMap[colorPlatformPosition[0]][colorPlatformPosition[1]])
+    #Если вернет None то ищем другую платформу для начала
+    if(checkColor(findColor) == None):
+      findColor(None)
+
     robotPosition = colorPlatformPosition
     if(cubeStorage):
       platformMap[robotPosition[0]][robotPosition[1]].status = 1
@@ -294,20 +307,21 @@ def main():
       platformMap[robotPosition[0]][robotPosition[1]].status = -1
     cubeStorage = 1
 
-def filterColor():
-    color = colorSensorGruz.color()
+def filterColor(sensor):
+    color = sensor.color()
+    distance = UltrasonicSensor.distance()
     colorFilter = [Color.RED,Color.BLUE,Color.YELLOW,Color.GREEN]
-    if(color == Color.BROWN):
-      color = Color.YELLOW
-    if(color == Color.GREEN):
-      if(colorSensorGruz.rgb()[1] < colorSensorGruz.rgb()[2]):
-        color = Color.BLUE
+    if(distance < Const_Normal_Distance):
+      if(color == Color.BROWN):
+        color = Color.YELLOW
+      if(color == Color.GREEN):
+        if(colorSensorGruz.rgb()[1] < colorSensorGruz.rgb()[2]):
+          color = Color.BLUE
+        else:
+          color = color
+      if(color in colorFilter):
+        return(color)
       else:
-        color = color
-    if(color in colorFilter):
-      return(color)
-    else:
-      return(None)
+        return(None)
 
-while(True):
-  print(UltrasonicSensor.distance())
+main()
