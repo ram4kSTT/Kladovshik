@@ -6,76 +6,126 @@ from pybricks.parameters import (Port, Stop, Direction, Button, Color,
                                  SoundFile, ImageFile, Align)
 from pybricks.tools import print, wait, StopWatch
 from pybricks.robotics import DriveBase
-
+# Новые импорты
 import platform as pl
 import time
-# Write your program here
-
-
-leftMotor = Motor(Port.B)
-rightMotor = Motor(Port.C)
-grabMotor = Motor(Port.D)
-
+# Инициализация моторов
+leftMotor = Motor(Port.C)
+rightMotor = Motor(Port.B)
+grabMotor1 = Motor(Port.D)
+grabMotor2 = Motor(Port.A)
+# Инициализация датчиков
 colorSensorGruz = ColorSensor(Port.S1)
 colorSensorRight = ColorSensor(Port.S2)
 colorSensorLeft = ColorSensor(Port.S3)
 UltrasonicSensor = UltrasonicSensor(Port.S4)
-
+# Константы
+#Const_turn_Angle = 260
 Const_turn_Angle = 195
 Const_turn_Speed = 180
+#Const_Razvorot_Angle = 460
 Const_Razvorot_Angle = 390
 Const_Grab_Speed = -125
-Const_Grab_angle = 180
+Const_Grab_angle = 70
+Const_Grab_angle2 = 275
 Const_Normal_Distance = 60
-Const_Go_Speed = 200
-Const_Relection_Limit = 10
-Const_Speed_Fline = 200
-Const_Slow_Speed_Fline = 100
+Const_Go_Speed = 300
+Const_Relection_Limit = 15
+Const_Speed_Fline = 250
+Const_Slow_Speed_Fline = 70
 Const_MotorRule_Speed = 150
 Const_checkColor_Speed = 50
 Const_Go_Forward_Speed = 300
 Const_Go_Forward_Time = 1.5
-Const_Desired_Color = 5
+Const_Go_Forward_Turn_Time = 0.5
 ev3AdeptedFlineSpeed = 250
-
-checkedColor = Color.BLACK
+# Начальный цвет
+Const_Desired_Color = Color.RED
 ############################################################################
 platformMap = [
   [pl.Platform(Color.RED),pl.Platform(Color.YELLOW),pl.Platform(Color.GREEN)],
   [pl.Platform(Color.GREEN),pl.Platform(Color.RED),pl.Platform(Color.BLUE)]
 ]
 robotPosition = [0,0]
-#####################################################################################
+############################################################################
+timeStart = 0
+def log(*texts):
+  print('TIME:['+str(time.time()-timeStart)+']')
+  for text in texts:
+    print(text)
+  print('------------------------')
+
+
+grabDirection = 1
 #разварачиваемся на 90 градусов
-#directionTurn - выбор направления поворота  значение может быть 1 (направо) или -1 (налево)
+#directionTurn - выбор напр+авления поворота  значение может быть 1 (направо) или -1 (налево)
 def turn(directionTurn):
-  print("turn:")
-  print(directionTurn)
+  log("Поворот (1 - право, -1 - лево, 0 - разворот):",directionTurn)
   rightMotor.reset_angle(0)
   if(directionTurn == 1 or directionTurn == -1):
     motorRule(Const_turn_Speed * directionTurn,-Const_turn_Speed * directionTurn)
     while(True):
       if(abs(rightMotor.angle()) >= Const_turn_Angle):
         motorStop()
-        return
+        break
   else:
     rightMotor.reset_angle(0)
     motorRule(Const_turn_Speed,-Const_turn_Speed)
     while(True):
       if(abs(rightMotor.angle()) >= Const_Razvorot_Angle):
         motorStop()
-        return
-   
+        break
+  GoForward(Const_Go_Forward_Speed,Const_Go_Forward_Speed,Const_Go_Forward_Turn_Time)
+   # 1 первое действие 
 #захват кубика манипулятором
 def grab():
-  print("захватываем кубик")
-  grabMotor.reset_angle(0)
-  grabMotor.run(Const_Grab_Speed)
+  global grabDirection
+  log("Захватил кубик")
+  capture()
+  grabMotor2.reset_angle(0)
+  grabMotor2.run(Const_Grab_Speed * grabDirection)
+  grabDirection = grabDirection * -1
   while(True):
-    if(abs(grabMotor.angle()) >= Const_Grab_angle ):
-        print("кубик")
-        grabMotor.stop()
-        return
+    if(abs(grabMotor2.angle()) >= Const_Grab_angle2 ):
+        grabMotor2.stop()
+        break
+  capture()
+  
+
+isCapture = False
+def capture():
+  global isCapture
+  grabMotor1.reset_angle(0)
+  if(isCapture):
+    grabMotor1.run(-Const_Grab_Speed)
+  else:
+    grabMotor1.run(Const_Grab_Speed)
+  isCapture = not isCapture 
+  while(True):
+    if(abs(grabMotor1.angle()) >= Const_Grab_angle ):
+        grabMotor1.stop()
+        break
+  
+  
+# метод для проезда вперёд на определёного времени
+#left - скорость  левого мотора 
+#right - скорость  правого мотора
+#times - время на которое включиться оба мотора
+def GoForward(left,right,times):
+    log("Еду вперёд на заданное время",str(times)) 
+    motorRule(left,right)
+    oldTime = time.time()
+    while(True):
+        newTime = time.time()
+        if(newTime - oldTime >= times):
+          motorStop()
+          return
+
+#останавлевает оба мотора
+def motorStop():
+  log("Выключение моторов")
+  leftMotor.stop()
+  rightMotor.stop()
 
 #езда по черной линии
 #left - мощность левого мотора
@@ -84,8 +134,25 @@ def motorRule(left,right):
     leftMotor.run(left)
     rightMotor.run(right)
 
+#едем по чёрной линии
+#reflectionLEFT - значение с датчика цвета
+#reflectionRight - значение с датчика цвета
+def fLine(reflectionLEFT,reflectionRight):
+    if(reflectionLEFT < Const_Relection_Limit):
+        if(reflectionRight < Const_Relection_Limit):
+          motorRule(Const_Speed_Fline,Const_Speed_Fline)
+        else:
+          motorRule(-Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
+    else:
+      if(reflectionRight < Const_Relection_Limit):
+        motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
+      else:
+        motorRule(Const_Speed_Fline,Const_Speed_Fline)
+
+#езда по черной линии (реализанно так как в ev3)
+#left - мощность левого мотора
+#right - мощность правого мотора
 def ev3AdepterMotorRule(angle,speed):
-  
   angle = angle * 0.15
   if(angle>100):
     angle=100
@@ -97,17 +164,18 @@ def ev3AdepterMotorRule(angle,speed):
   elif(angle < 0):
     motorRule(speed * factorAngleSpeed,speed)
 
+#едем по чёрной линии (плавная реализация)
+#reflectionLEFT - значение с датчика цвета
+#reflectionRight - значение с датчика цвета
 def ev3AdeptedFline(reflectionLEFT,reflectionRight):
   ev3AdepterMotorRule(reflectionLEFT - reflectionRight,ev3AdeptedflineSpeed)
 
 #езда по черной линии
 #crossroadCounts - кол-во перекрестков, которые необходимо проехать
 def crossroadGo(crossroadCounts):
-  print("crossroadGo:")
-  print(crossroadCounts)
+  log("Проезжаю заданное кол-во перекрестков:",crossroadCounts)
   crossroad = 0
   blackLine = False
-  print("едем по чёрной линии")
   while(True):
     reflectionLEFT = colorSensorLeft.reflection()
     reflectionRight = colorSensorRight.reflection()
@@ -124,16 +192,31 @@ def crossroadGo(crossroadCounts):
     else:
       blackLine = False
 
+def filterColor(sensor):
+    color = sensor.color()
+    distance = UltrasonicSensor.distance()
+    colorFilter = [Color.RED,Color.BLUE,Color.YELLOW,Color.GREEN]
+    if(distance < Const_Normal_Distance):
+      if(color == Color.BROWN):
+        color = Color.YELLOW
+      if(color == Color.GREEN):
+        if(colorSensorGruz.rgb()[1] < colorSensorGruz.rgb()[2]):
+          color = Color.BLUE
+        else:
+          color = color
+      if(color in colorFilter):
+        return(color)
+      else:
+        return(None)
+
 #определяет путь от местоположение робота до нужной платформы
 #Robot - координаты робота
 #Platform - координаты платформы
 def logic(Robot,Platform):
-  print("logic:")
-  print("рассчитываем путь")
+  log("logic:")
+  log("рассчитываем путь",Platform,Robot)
   povorot1 = 0 
   povorot2 = 0
-  print(Platform)
-  print(Robot)
   horizontal = Platform[1] - Robot[1]
 
   robotWay = [["razovorot", 0 ],["crossroadGo",1] ]
@@ -161,69 +244,36 @@ def logic(Robot,Platform):
   
   return robotWay
 
-
 # смотрит цвет кубика и записывает его в переменную
 def checkColor(colorPlatform):
-  print("чекаем цвет")
+  log("Еду вперед и жду платформу или цвет:",colorPlatform)
+  if(isCapture):
+    capture()
   color = None
   iteration = 0
   while(True):
+    distance = UltrasonicSensor.distance()
+    reflectionLEFT = colorSensorLeft.reflection()
+    reflectionRight = colorSensorRight.reflection()
     if(iteration % 2 == 0):
-      reflectionLEFT = colorSensorLeft.reflection()
-      reflectionRight = colorSensorRight.reflection()
-
-      fLine(reflectionLEFT,reflectionRight)
+      if(distance > Const_Normal_Distance):
+        fLine(reflectionLEFT,reflectionRight)
+      else:
+        motorRule(Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
     if(colorPlatform != None):
       if(colorPlatform == filterColor(colorSensorLeft)):
         return None
     else:
       color = filterColor(colorSensorGruz)
       if(color != None):
-        print("нашел цвет:")
-        print(color)
+        log("Нашел кубик цвета:",color)
         return color
     iteration = iteration + 1
-
-#едем по чёрной линии
-#reflectionLEFT - значение с датчика цвета
-#reflectionRight - значение с датчика цвета
-def fLine(reflectionLEFT,reflectionRight):
-    if(reflectionLEFT < Const_Relection_Limit):
-        if(reflectionRight < Const_Relection_Limit):
-          motorRule(Const_Speed_Fline,Const_Speed_Fline)
-        else:
-          motorRule(-Const_Slow_Speed_Fline,Const_Slow_Speed_Fline)
-    else:
-      if(reflectionRight < Const_Relection_Limit):
-        motorRule(Const_Slow_Speed_Fline,-Const_Slow_Speed_Fline)
-      else:
-        motorRule(Const_Speed_Fline,Const_Speed_Fline)
-
-# метод для проезда вперёд на определёного времени
-#left - скорость  левого мотора 
-#right - скорость  правого мотора
-#times - время на которое включиться оба мотора
-def GoForward(left,right,times):
-    print("проехать вперёд" + str(times)) 
-    motorRule(left,right)
-    oldTime = time.time()
-    while(True):
-        newTime = time.time()
-        if(newTime - oldTime >= times):
-          motorStop()
-          return
-
-#останавлевает оба мотора
-def motorStop():
-  print("выключаем оба мотора")
-  leftMotor.stop()
-  rightMotor.stop()
 
 #вызывает последовательность методов соотвесвующие полученным командам
 #robotWay - набор команд для проезда робота до нужной платформы
 def perfomer(robotWay):
-  print("perfomer:")
-  print(robotWay)
+  log("Метод исполнитель(perfomer)","Исполняю:",robotWay)
   for way in robotWay:
     if(way[0] == "turn"):
       turn(way[1])
@@ -236,14 +286,13 @@ def perfomer(robotWay):
 
 #метод для проезда до стартовой платформы
 def start():
-  print("едем до стартовой платформы")
+  log("Еду до стартовой платформы")
   GoForward(Const_Go_Forward_Speed,Const_Go_Forward_Speed, Const_Go_Forward_Time)
   perfomer([["crossroadGo",1],["turn",-1]])
   
 #ищет нужную платформу
 def findColor(color):
-  print("ищем нужную платформу")
-  print('цвет:'+str(color))
+  log("Ищем нужную платформу",'цвет:',str(color))
   for x in range(0,3):
     for y in range(0,2):
       distance = UltrasonicSensor.distance()
@@ -255,73 +304,72 @@ def findColor(color):
         if(thisPlatform.color == color):
           if(thisPlatform.status == -1 or thisPlatform.status == 0):
             return [y,x]
-  print("ничего не нашел")
+  log("ERROR: ничего не нашел")
 
-def pereborPlatform(robotPosition):
-  print("перебираю гаражи")
+# Перебираем платформы пока не найдем нужный цвет
+def pereborPlatform():
+  global robotPosition
+  log("Перебираю гаражи в поисках начального цвета")
   for x in range(0,3): 
     for y in range(0,2):
       if(x != 0 or y != 0):
         #TODO
         newLogic = logic(robotPosition,[y,x])
         perfomer(newLogic)
-        color = checkColor()
+        color = checkColor(None)
         robotPosition = [y,x]
         if(color==Const_Desired_Color):
-          print('Нашел нужный цвет')
-          print(color)
+          log('Нашел нужный цвет',color)
+          GoForward(Const_Go_Forward_Speed,Const_Go_Forward_Speed,0.2)
+          
           return robotPosition
         GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
         
 
 def main():
+  global timeStart
+  timeStart = time.time()
+  
   cubeStorage = False
-  robotPosition = [0,0]
+  global robotPosition
+  capture()
   start()
   color = checkColor(None)
+
+  
+
   if(filterColor(colorSensorGruz)!=Const_Desired_Color):
     GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
-    robotPosition = pereborPlatform(robotPosition)
+    pereborPlatform()
     platformMap[robotPosition[0]][robotPosition[1]].status= -1
     cubeStorage = True
-  print('нашел нужный цвет!')
+
   for x in range(0,6):
     colorPlatformPosition = findColor(filterColor(colorSensorGruz))
-    GoForward(20,20,0.2)#TODO
+    GoForward(20,20,0.2)#TODO константы!
     grab()
     GoForward(-Const_Go_Forward_Speed,-Const_Go_Forward_Speed,Const_Go_Forward_Time/2)
-    GoForward(20,20,0.-0.2)
+    capture()
+
     newLogic = logic(robotPosition,colorPlatformPosition)
     perfomer(newLogic)
-    #Если мы знаем, что едем нга пустую платформу, то вызываем checkColor с параметром не NONE
-    if(colorPlatformPosition.status = -1):
-      checkColor(platformMap[colorPlatformPosition[0]][colorPlatformPosition[1]])
-    #Если вернет None то ищем другую платформу для начала
-    if(checkColor(findColor) == None):
-      findColor(None)
-
     robotPosition = colorPlatformPosition
+    #Если мы знаем, что едем нга пустую платформу, то вызываем checkColor с параметром не NONE
+    if(platformMap[colorPlatformPosition[0]][colorPlatformPosition[1]].status == -1):
+      checkColor(platformMap[colorPlatformPosition[0]][colorPlatformPosition[1]].color)
+      grab()
+      nextColorPlatformPosition = findColor(None)
+      newLogic = logic(robotPosition,colorPlatformPosition)
+      perfomer(newLogic)
+      robotPosition = nextColorPlatformPosition
+    #Если вернет None то ищем другую платформу для начала
+    else:
+      checkColor(None)
+     
     if(cubeStorage):
       platformMap[robotPosition[0]][robotPosition[1]].status = 1
     else:
       platformMap[robotPosition[0]][robotPosition[1]].status = -1
     cubeStorage = 1
-
-def filterColor(sensor):
-    color = sensor.color()
-    distance = UltrasonicSensor.distance()
-    colorFilter = [Color.RED,Color.BLUE,Color.YELLOW,Color.GREEN]
-    if(distance < Const_Normal_Distance):
-      if(color == Color.BROWN):
-        color = Color.YELLOW
-      if(color == Color.GREEN):
-        if(colorSensorGruz.rgb()[1] < colorSensorGruz.rgb()[2]):
-          color = Color.BLUE
-        else:
-          color = color
-      if(color in colorFilter):
-        return(color)
-      else:
-        return(None)
 
 main()
